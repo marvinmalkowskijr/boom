@@ -6,6 +6,8 @@ import requests
 import sys
 import time
 
+requests.packages.urllib3.disable_warnings()
+
 try:
     import urlparse
 except ImportError:
@@ -131,7 +133,7 @@ def print_stats(results):
     elif rps > 50:
         print('BSI              \t\tMeh')
     else:
-        print('BSI              \t\tHahahaha')
+        print('BSI              \t\Poor')
     print('')
     print('-------- Status codes --------')
     for code, items in results.status_code_counter.items():
@@ -142,8 +144,14 @@ def print_stats(results):
     print('BSI: Boom Speed Index')
 
 
-def print_server_info(url, method, headers=None):
-    res = requests.head(url)
+def print_server_info(url, method, verifyssldisable=None, headers=None):
+
+    if  verifyssldisable == True:
+        res = requests.head(url, verify=False)
+    else:
+        res = requests.head(url)
+
+
     print(
         'Server Software: %s' %
         res.headers.get('server', 'Unknown'))
@@ -205,7 +213,7 @@ def onecall(method, url, results, **options):
 
 def run(
     url, num=1, duration=None, method='GET', data=None, ct='text/plain',
-        auth=None, concurrency=1, headers=None, pre_hook=None, post_hook=None,
+        auth=None, verifyssldisable=None, concurrency=1, headers=None, pre_hook=None, post_hook=None,
         quiet=False):
 
     if headers is None:
@@ -232,6 +240,9 @@ def run(
 
     if auth is not None:
         options['auth'] = tuple(auth.split(':', 1))
+
+    if verifyssldisable is not None:
+        options['verify'] = False
 
     pool = Pool(concurrency)
 
@@ -286,10 +297,10 @@ def resolve(url):
             original, host)
 
 
-def load(url, requests, concurrency, duration, method, data, ct, auth,
-         headers=None, pre_hook=None, post_hook=None, quiet=False):
+def load(url, requests, concurrency, duration, method, data, ct, auth, verifyssldisable=None, 
+    headers=None, pre_hook=None, post_hook=None, quiet=False):
     if not quiet:
-        print_server_info(url, method, headers=headers)
+        print_server_info(url, method, verifyssldisable, headers=headers)
 
         if requests is not None:
             print('Running %d queries - concurrency %d' % (requests,
@@ -301,7 +312,7 @@ def load(url, requests, concurrency, duration, method, data, ct, auth,
         sys.stdout.write('Starting the load')
     try:
         return run(url, requests, duration, method,
-                   data, ct, auth, concurrency, headers,
+                   data, ct, auth, verifyssldisable, concurrency, headers,
                    pre_hook, post_hook, quiet=quiet)
     finally:
         if not quiet:
@@ -335,6 +346,10 @@ def main():
 
     parser.add_argument('--header', help='Custom header. name:value',
                         type=str, action='append')
+
+    parser.add_argument('--verifyssldisable', help='Disable SSL Verification',
+                         action='store_true')
+    
 
     parser.add_argument('--pre-hook',
                         help=("Python module path (eg: mymodule.pre_hook) "
@@ -415,11 +430,12 @@ def main():
 
     if original != resolved and 'Host' not in headers:
         headers['Host'] = original
+    
 
     try:
         res = load(
             url, args.requests, args.concurrency, args.duration,
-            args.method, args.data, args.content_type, args.auth,
+            args.method, args.data, args.content_type, args.auth, args.verifyssldisable,
             headers=headers, pre_hook=args.pre_hook,
             post_hook=args.post_hook, quiet=(args.json_output or args.quiet))
     except RequestException as e:
@@ -437,3 +453,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+1
